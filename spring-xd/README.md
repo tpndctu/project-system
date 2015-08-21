@@ -22,4 +22,42 @@ stream create filedemo --definition "kafka --zkconnect=localhost:2181 --topic=my
     ```
 (Note: mytopic exits in Kafka server, alter 10 senconds write file to HDFS).
     * Check data on HDFS: `hadoop fs cat /tmp/dhnhan/data.txt`
-
+* **Use Taps and label in Spring XD**
+```
+----------          -------------            -------------           ----------
+| Source |     -->  | Processor1 |     -->   | Processor2 |    -->   | Sink 1 |
+----------          -------------            -------------           ----------
+                         |
+                         |
+                         |       --------------          ---------
+                         ----->  | Processor3 |    -->   | Sink2 |
+                                 --------------          ---------
+ Source : HTTP
+ Processor1: f1:filter --expression=payload.contains('a') (Spark Aggregate)
+ Processor2: f2:filter --expression=payload=='NoAlarm' (Spark div alarm)
+ Processor3: f3:filter --expression='Alarm' (Spark Alarm)
+ Sink1: Log (HDFS)
+ Sink2: File (Kafka)
+```
+ * XD Shell:
+  * Create stream noalrm:
+  ```
+   stream create --name noalarm --definition "http | f1: filter --expression=payload.contains('a') | f2: filter --expression=payload== 'NoAlarm' | log" --deploy
+  ```
+  * Create stream Alarm:
+  ```
+   stream create --name alarm --definition "tap:stream:noalarm.f1 > f3: filter --expression=payload=='Alarm' | file --dir=E:\\" --deploy
+  ```
+  * Test stream:
+  ```
+   http post --data="NoAlarm"
+   http post --data="Alarm"
+  ```
+  * Check file in E:\alarm.out
+  ```
+  Alarm
+  ```
+  * Check Log in xd  singlestanalone
+  ```
+   NoAlarm
+  ```
